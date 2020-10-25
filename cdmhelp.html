@@ -1,0 +1,136 @@
+
+<h3>Code Data Management module help</h3>
+<i>(c) 2004-2005 Ashley Kitson, UK.  This document and associated program works are licensed under the GNU General Public License Version 2</i>
+<p>The Code Data Management module (or CDM) is a building block module that is aimed at assisting Xoops business systems developers.
+<h4>Background</h4>
+Most business systems (and many non-business ones) rely on codes to codify data in their databases.  You can think of common ones such as country codes, currency codes etc.  This is such a common task that a way of handling all code requirements within a set of applications that make up a business system is seen as desirable and efficient.  In large organisations a function of IT may be to maintain a core set of codes used by the rest of the organisation so that strict integrity can be maintained between different applications.  It does not make sense for two applications wanting to use currency codes for instance to use two different sets which may or may not be the same sets.
+<p>Thus CDM was borne, primarily as a building block for the author's own application building project, but also as a way to give a bit back to the Xoops community.  As it was the author's first Xoops application it was good way to learn the Xoops API and the code has been liberally sprinkled with comments to assist any other would be Xoops programmers in what at first can seem (and was!) a daunting task.
+<h4>What does it do?</h4>
+CDM provides the following functionality;
+<ul>
+<li>Provides a central repository for all codes that may be used in one or more Xoops applications
+<li>Provides central management of code data utilising Xoops group authority mechanisms
+<li>Provides a program API based on xoopsObject that can easily extended for additional application functionality
+</ul>
+<h4>Change log</h4>
+V1.0 Basic release<br>
+V1.1 Added cd_param field to cdm_code to add user defineable parameters for a code<br>
+V1.2 Added ability to bulk upload data from SQL insert statement file<br>
+V1.3 Added full support for hierarchical code sets
+<h4>Installing CDM</h4>
+Installing CDM is as straightforward as installing any other Xoops module.  Simply unpack the archive file into a directory called 'cdm' in your Xoops module directory.  Then install as for any other module using the Xoops administration-modules functionality.  There is no configuration to be done and no admin menu for CDM.  The installation process loads 4 default sets of codes 1/BASE - just a holder for application base data, 2/LANGUAGE - the set of allowable languages that codes can be recorded under, 3/ CURRENCY - set of ISO currency codes, 4/ COUNTRY - set of ISO country codes.
+<p>By default the module is available to the administrator and registered users group.  You can of course give access to other groups if required.
+<h4>Concepts</h4>
+It is important to understand a few concepts about CDM before beginning to use it.
+<p><i>What constitutes a code set?</i> Each code set is made up from 2 entities, the meta data about the code set and the code set itself;<br>
+The meta data describes the name and purpose of the code set.  It also defines the data type and length of the code and the code value.  Meta data is held in the cdm_meta table which is defined as:<br>
+&nbsp;cdm_meta (<br>
+&nbsp;&nbsp;cd_set varchar(10) NOT NULL default 'BASE',<br>
+&nbsp;&nbsp;cd_type enum('INTEGER','BIGINT','CHAR','VARCHAR') NOT NULL default 'CHAR',<br>
+&nbsp;&nbsp;cd_len int(10) unsigned NOT NULL default '0',<br>
+&nbsp;&nbsp;val_type enum('INTEGER','BIGINT','CHAR','VARCHAR') NOT NULL default 'VARCHAR',<br>
+&nbsp;&nbsp;val_len int(10) unsigned NOT NULL default '255',<br>
+&nbsp;&nbsp;cd_desc varchar(255) default NULL,<br>
+&nbsp;&nbsp;row_flag enum('Active','Defunct','Suspended') default 'Active',<br>
+&nbsp;&nbsp;row_uid int(10) unsigned default '0',<br>
+&nbsp;&nbsp;row_dt timestamp(6) NOT NULL,<br>
+&nbsp;&nbsp;PRIMARY KEY  (cd_set))
+
+<p>The code set contains an entry for each code that makes up a code set.  Most importantly however, a code set can contain multiple entries for a code distinguished by different languages.  This allows multi lingual code sets to be presented to the user where the code itslef remains the same but the value displayed to the user is in different languages. Code data is held in the cdm_code table which is defined as:<br>
+&nbsp;cdm_code (<br>
+&nbsp;&nbsp;id bigint(20) NOT NULL auto_increment,<br>
+&nbsp;&nbsp;cd_set varchar(10) NOT NULL default '',<br>
+&nbsp;&nbsp;cd_lang varchar(10) NOT NULL default 'EN',<br>
+&nbsp;&nbsp;cd varchar(10) NOT NULL default '',<br>
+&nbsp;&nbsp;cd_prnt varchar(10) default NULL,<br>
+&nbsp;&nbsp;cd_value varchar(50) default NULL,<br>
+&nbsp;&nbsp;cd_desc varchar(255) default NULL,<br>
+&nbsp;&nbsp;cd_param varchar(255) default NULL,<br>
+&nbsp;&nbsp;row_flag enum('Active','Defunct','Suspended') NOT NULL default 'Active',<br>
+&nbsp;&nbsp;row_uid int(10) unsigned NOT NULL default '0',<br>
+&nbsp;&nbsp;row_dt timestamp(6) NOT NULL,<br>
+&nbsp;&nbsp;PRIMARY KEY  (id),<br>
+&nbsp;&nbsp;UNIQUE KEY cdm_code_main_index (cd_set,cd_lang,cd),<br>
+&nbsp;&nbsp;KEY cdm_code_FKIndex1 (cd_set))
+
+<p>Note that although the primary key is an auto-incrementing integer for efficiency, the real index to the data is on SetName, Language and Code name.
+<p><i>Data is never deleted.</i> In the CDM user interface discussed later, when you select a set or code to delete, it is not in fact deleted.  It is "defuncted", (made unuseable.)  This (within the interface given anyway) is an irreversable process.  Once defunct, always defunct.  Similarly if you defunct a set, then all its associated codes are made defunct.  The only way to reverse this is to use a manual SQL command (perhaps via phpMyAdmin.)  By default new codes and sets are flagged as active.  You can set them as Suspended.  If Suspended they may be made active again.  Why go to all this trouble?  In the real world there will be times when you do need to take a code out of action temporarily, hence suspension.  There are also times when a code goes out of action permanently.  If we simply delete it, then any application data that relies on the code for meaning becomes meaningless.  Thus we defunct it ensuring that any relationship to the code data is maintained, but at the same time making sure we cannot use the code again in future. All of the main programm API functions will only return code data that is 'Active'.  Thus if you stick to the public API you should never have invalid code information.
+<p>In addition to recording the code or set status, the system also records the name of the last user to edit data and the date and time.  this can be used for auditing purposes.
+<h4>Using CDM</h4>
+<h5>Interactive Use</h5>
+Go to your site main page and click on the 'Code Data Management' menu item.  the screen will display 2 sets of information.  In the top table you will see the list of available code sets.  In the bottom table you will see all the codes for the currently selected code set.
+<p>Hopefully the screens are easy enough to navigate.  Click the Browse icon next to a code set to see the codes associated with it.  Click the edit button for a set or code to go to its full details and to make changes.
+<p>Above the Set and Code tables is another insert button.  Click the Set insert button to create a new Code Set.  Click the Code insert button to create a new code for the <i>currently selected set.</i>
+<P><I>About the code parameter field</i>. This is essentially a user defineable field and was added at V1.1 to satisfy user requirements to be able to hold characteristic data or parameters for a code. E.g. a code set for shapes what want to have additional data describing the shape i.e. No of sides, colour, size; therefore code parameters might be set as 4|Red|Big or sides=4,colour=red,size=big.  The choice of parameters and how you seperate them is up to you.  I do recommend however that you use the pipe "|" character as a seperator for consistency. Be aware however that you can only decide the rules for a codeset if you originate it.  If for instance you want to change the inbuilt country set you can only really do so for yourself as the originator (in this case me) may not wish to have that set of parameters (although in my case, I'm open to suggestion!)  You are limited to a total of 255 characters in the parameter field.
+<p><i>About hierarchical code sets.</i> You can construct code sets that have a tree hierarchy simply by adding the code for the parent to each child code.  When you display the edit screen for the parent code, its child codes are displayed on the screen and you can hyperlink through to the children. Support is given in the CDMSet object to create a xoopsTree object of hierarchical code sets that can then be used by your application.
+<h5>Adding bulk data to CDM</h5>
+Although you can add a set and codes manually, there will be times when you want to mass add codes in one hit.  Use the bulk update facility in CDM for this.  You will need to provide a valid SQL syntax file donating the data insert commands for this.  Take a look at test.sql in the cdm sql directory for an example file.  *Very* important. You need to have as your first line the:<br>
+set @lang = '&lt;a language code&gt;';<br>
+whether or not you intend to use it as shown in the test.sql example file.  This allows data set authors to create a single upload file for similar languages.  The most common of these is probably ENGB and ENUS.  If the statement is not present as the first line, the upload file will not generate entries in the database.  If you need to change the language set from its default, make sure it conforms to one that is in the default system language code set.
+<p>Please note that for Xoops to accept .sql files for upload and processing you will need to amend your xoops/class/mimetypes.inc.php to contain an entry for .sql files;<br>
+"sql"		=> "text/plain",
+<p>If you are not comfortable doing this, simply use a .txt extension for your sql files.  Xoops will accept these happily.
+<p>Please note that the sql command interpreter will accept most valid SQL including deletes.  You cannot however use core XOOPS tables in your commands.  One other thing, you need to have your Xoops/upload directory set to be world writeable. By default this should be the case anyway, but if you do get problems, check this first.
+<p>If you want to run the "test.sql" file to try it out, you can run the "delete_test_data.sql" file after to remove the test data from the database.  The bulk update facility may also be used by the system authors to apply patches to CDM installation prior to V2.2 of Xoops.
+<h5>The API</h5>
+The real utility of CDM comes when you incorporate it into your own module.  You need to do a few simple things to access CDM.
+<p>1/ In the <b>header.php</b> script of your own module add the following line after your include to mainfile.php;
+<p> require XOOPS_ROOT_PATH."/modules/cdm/include/defines.php";
+<p>2/ If you want to use the built in xoopsForm extensions for CURRENCY, COUNTRY, LANGUAGE and ROW_STATUS in a form generation page include the following line somewhere at the head of your script;
+<p> require_once CDM_PATH."/class/class.cdm.form.php";
+<p>By far and away the easiest way to use CDM is by extending the CDMFormSelect object found in the <b>class.cdm.form.php</b> script. Take a look at that script to see how the CDMFormSelectCountry and other code select list objects are instantiated and use them as a model to create your own class. 
+<p>NB. Under normal circumstances you should write any extensions to the CDM classes within your own code base.  This ensures that any updates to CDM in the future will not require you to patch the code.  The following might act as a template for a class that you create for your own application (in this example for a code set called 'CARDS';
+<p><i>filename=class.mymodule.form.php</i><br><br>
+&nbsp;require_once CDM_PATH."/class/class.cdm.form.php";
+<p>&nbsp;class MyModuleFormSelectCards extends CDMFormSelect {<br>
+&nbsp;&nbsp;function MyModuleFormSelectCards($caption, $name, $value=null, $size=1, $lang=CDM_DEF_LANG) {<br>
+&nbsp;&nbsp;$this->CDMFormSelect('CARDS', $caption, $name, $value, $size, $lang);<br>
+&nbsp;&nbsp;}<br>
+&nbsp;}<br>
+<p>In your form creation script your would include or require class.mymodule.form.php and create a new Select box with something like;<br>
+$cards = new MyModuleFormSelectCards('Select a card','card');
+<p>Take a look at the scripts <b>cdm_codes_edit.php</b> and <b>cdm_meta_edit.php</b> to see the built in CDMForms objects being used.
+<p>If you want to do something more complex with your code data then you will need to use the CDMMeta, CDMCode and CDMSet objects with their associated handlers directly.  The class tree for these objects is:
+<p>XoopsObject<br>
+---> CDMBaseObject<br>
+--------> CDMMeta<br>
+--------> CDMCode<br>
+--------> CDMSet<br>
+
+<p>XoopsObjectHandler<br>
+---> CDMBaseHandler<br>
+--------> CdmCDMMetaHandler<br>
+--------> CdmCDMCodeHandler<br>
+--------> CdmCDMSetHandler<br>
+
+<p>To use these objects you create a handler object and then ask it to create or get the data object e.g.;
+<p>//NB CDM_DIR is a constant set in defines.php and must be used in calls to xoops_getModuleHandler<br>
+$setHandler = xoops_getModuleHandler("CDMSet",CDM_DIR);<br>
+$set =& $setHandler->get("SOMESET");<br>
+$set2 =  $setHandler->create();
+<p>There are a few utility functions that you can use in your code as well.  Include the include/functions.php file to access them.  Functions are:
+<blockquote>function CDMGetCode($codeSet, $codeKey, $lang=CDM_DEF_LANG)<br>
+Returns a the code value for a given set and code key.
+<p>function CDMGetParams($codeSet, $codeKey, $lang=CDM_DEF_LANG)<br>
+Returns a the parameters for a given set and code key. (Tip - use PHP explode function to seperate the paramater string into an indexed array.)
+<p>function CDMCheckCode($codeSet, $codeKey, $value, $lang=CDM_DEF_LANG)<br>
+Checks a code for a given value and returns TRUE if correct else FALSE.
+<p>function CDMGetCodeSet($codeSet, $lang=CDM_DEF_LANG)<br>
+Returns CDMCodeSet object for the given codeset identifer.
+<p>function CDMGetCodeObj($codeSet, $codeKey, $lang=CDM_DEF_LANG)<br>
+Returns a CDMCode object for the requested code in a set.
+<p>function getXoopsUser($id)<br>
+ Return a valid xoops user name given the user id
+</blockquote>
+<p>Check out the <a href="./docs/">phpDocumentor documentation</a> for further details
+<p>Take a look at <b>index.php, cdm_codes_edit.php </b>and <b>cdm_meta_edit.php</b> for more examples.  You will also need to study <b>class.cdm.base.php, CDMMeta.php, CDMCode.php </b>and <b>CDMSet.php</b> for class definitions.  Beware however that under normal circumstances, you should avoid using the "getall" methods of the handler objects as they will return all data (suspended and defunct) which is not usually what you require.  Use the "get" method.
+<h3>Acknowledgements</h3>
+Thanks to various people on the Xoops dev and support forums who by solving problems before me, made this a slightly less painful exercise than could have been :-)<br>Thanks also to the phpMyAdmin team who made using MySql easy (and who I nicked the icons off but I can't find the right person to thank so I'm saying it here.)
+<h3>Getting help and reporting bugs</h3>
+The code for this module is maintained via the <a href="http://dev.xoops.org">Xoops Development</a> facility.  Somewhat bizarrely, you need to look in the "Auction Rooms (aaucroom)" project for CDM project files.  CDM is a precursor to a full Auction System.  The next step will be a simple double entry book-keeping/accounting system (which also needs CDM, get it? :-). Use the facilities there to report and track bugs and get latest downloads. Demo and support facilities are kept on my own <a href="http://akitson.bbcb.co.uk">website</a>
+<h3>Licensing</h3>
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
+<p>You may not change or alter any portion of this comment or credits of supporting developers from this source code or any supporting source code which is considered copyrighted (c) material of the original comment or credit authors.
+<p>This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+<p>You should have received a copy of the GNU General Public License along with this program; if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA or see <a href="http://www.gnu.org/copyleft/gpl.html">http://www.gnu.org/copyleft/gpl.html</a>
+
